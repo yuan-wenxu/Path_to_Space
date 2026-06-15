@@ -1,0 +1,14 @@
+Path_to_Space
+Copyright 2026 wenxu yuan
+
+This repository adapts ideas and portions of implementation structure from
+Path2Space companion code by Eldad D. Shulman and contributors.
+
+Upstream project:
+https://github.com/eldadshulman/path2space-companion
+
+Upstream license:
+Apache License 2.0
+
+Files in this repository have been modified from the upstream design and are
+provided as a simplified inference-focused variant.

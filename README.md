@@ -4,6 +4,18 @@ This folder contains a stripped-down inference-only version of the original Path
 
 The `scripts/` folder now has a single entrypoint, `run_inference.py`. Helper modules live in `scripts/common/`, using normal package imports.
 
+## License
+
+This repository is distributed under the Apache License 2.0. See [LICENSE](LICENSE).
+
+It is a simplified inference-focused adaptation related to the official
+`path2space-companion` project:
+
+- upstream repository: `https://github.com/eldadshulman/path2space-companion`
+- upstream license: Apache License 2.0
+
+See [NOTICE](NOTICE) for attribution details.
+
 ## Included pipeline
 
 1. Read one H&E slide image.
