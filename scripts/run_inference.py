@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common.cell_type_model import predict_cell_types
 from common.image_features import extract_spot_features, save_mask_figure
-from common.st_model import predict_st
+from common.st_model import predict_st, smooth_st_predictions
 
 
 def parse_args():
@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument("--output-dir", required=True, help="Directory where predictions will be saved")
     parser.add_argument("--batch-size", type=int, default=128, help="Feature extraction batch size")
     parser.add_argument("--tile-size", type=int, default=224, help="Tile size in pixels")
-    parser.add_argument("--spot-spacing-microns", type=float, default=100.0, help="Sampling interval in microns")
+    parser.add_argument("--smooth-radius", type=float, default=2.0, help="KDTree smoothing radius in grid coordinates")
     parser.add_argument("--device", default=None, help="Torch device, e.g. cuda, cuda:0, or cpu")
     parser.add_argument(
         "--cell-model",
@@ -66,7 +66,6 @@ def main():
         batch_size=args.batch_size,
         device_name=args.device,
         tile_size=args.tile_size,
-        spacing_microns=args.spot_spacing_microns,
     )
 
     slide_metadata.to_csv(os.path.join(args.output_dir, f"{slide_name}_metadata.csv"), index=False)
@@ -89,6 +88,12 @@ def main():
     st_df.to_pickle(st_path)
     st_df.to_csv(os.path.join(args.output_dir, f"{slide_name}_st_predictions.csv"))
     print(f"Saved ST predictions to {st_path}")
+
+    st_smooth_df = smooth_st_predictions(st_df, args.gene_file, radius=args.smooth_radius)
+    st_smooth_path = os.path.join(args.output_dir, f"{slide_name}_st_predictions_smoothed.pkl")
+    st_smooth_df.to_pickle(st_smooth_path)
+    st_smooth_df.to_csv(os.path.join(args.output_dir, f"{slide_name}_st_predictions_smoothed.csv"))
+    print(f"Saved smoothed ST predictions to {st_smooth_path}")
 
     if args.cell_model and args.cell_feature_list:
         cell_df = predict_cell_types(st_df, args.cell_model, args.cell_feature_list)

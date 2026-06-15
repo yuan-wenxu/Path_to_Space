@@ -91,43 +91,38 @@ def build_slide_sampling_metadata(
     slide_image_path: str,
     slide_name: str,
     microns_per_pixel: float,
-    spacing_microns: float = 100.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if microns_per_pixel <= 0:
         raise ValueError("microns_per_pixel must be greater than 0.")
 
     image = skimage.io.imread(slide_image_path)
     image_height, image_width = image.shape[:2]
-    spacing_pixels = spacing_microns / microns_per_pixel
     sample_size_pixels = SAMPLE_SIZE_MICRONS / microns_per_pixel
-    if spacing_pixels <= 0:
-        raise ValueError("Computed spacing in pixels must be greater than 0.")
     if sample_size_pixels <= 0:
         raise ValueError("Computed sample size in pixels must be greater than 0.")
 
-    half_tile = int(round(sample_size_pixels / 2.0))
-    min_x = half_tile
-    max_x = image_width - half_tile
-    min_y = half_tile
-    max_y = image_height - half_tile
+    sample_size_pixels_int = int(round(sample_size_pixels))
+    if sample_size_pixels_int <= 0:
+        raise ValueError("Rounded sample size in pixels must be greater than 0.")
 
-    if min_x >= max_x or min_y >= max_y:
+    if image_width < sample_size_pixels_int or image_height < sample_size_pixels_int:
         raise ValueError("The input image is smaller than one tile and cannot be sampled.")
 
-    x_centers = np.arange(min_x, max_x + 1e-6, spacing_pixels)
-    y_centers = np.arange(min_y, max_y + 1e-6, spacing_pixels)
+    half_tile = sample_size_pixels_int // 2
+    x_starts = np.arange(0, image_width - sample_size_pixels_int + 1, sample_size_pixels_int)
+    y_starts = np.arange(0, image_height - sample_size_pixels_int + 1, sample_size_pixels_int)
 
     spot_rows = []
-    for y_index, pixel_y in enumerate(y_centers):
-        for x_index, pixel_x in enumerate(x_centers):
+    for x_index, start_x in enumerate(x_starts):
+        for y_index, start_y in enumerate(y_starts):
             spot_rows.append(
                 {
                     "slide_name": slide_name,
                     "selected": 1,
                     "x": x_index,
                     "y": y_index,
-                    "pixel_x": int(round(float(pixel_x))),
-                    "pixel_y": int(round(float(pixel_y))),
+                    "pixel_x": int(start_x + half_tile),
+                    "pixel_y": int(start_y + half_tile),
                 }
             )
 
@@ -139,8 +134,6 @@ def build_slide_sampling_metadata(
                 "image_width": image_width,
                 "image_height": image_height,
                 "microns_per_pixel": microns_per_pixel,
-                "spot_spacing_microns": spacing_microns,
-                "spot_spacing_pixels": spacing_pixels,
                 "sample_size_microns": SAMPLE_SIZE_MICRONS,
                 "sample_size_pixels": sample_size_pixels,
             }
@@ -185,7 +178,6 @@ def extract_spot_features(
     batch_size: int = 128,
     device_name: str | None = None,
     tile_size: int = 224,
-    spacing_microns: float = 100.0,
 ) -> tuple[FeatureList, pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
     device = get_device(device_name)
     color_normalizer = macenko_normalizer()
@@ -193,7 +185,6 @@ def extract_spot_features(
         slide_image_path=slide_image_path,
         slide_name=slide_name,
         microns_per_pixel=microns_per_pixel,
-        spacing_microns=spacing_microns,
     )
     slide_img = skimage.io.imread(slide_image_path)
     spots = spots[spots["selected"] == 1].sort_values(["x", "y"])
@@ -241,10 +232,10 @@ def extract_spot_features(
 
     features = tiles_to_features(tiles_list, ctranspath_weights, batch_size, device, tile_size)
     line_color = np.array([0, 255, 0], dtype=np.uint8)
-    img_mask[:, ::tile_size, :] = line_color
-    img_mask[::tile_size, :, :] = line_color
-    processed_mask[:, ::tile_size, :] = line_color
-    processed_mask[::tile_size, :, :] = line_color
+    img_mask[:, ::sample_size_pixels, :] = line_color
+    img_mask[::sample_size_pixels, :, :] = line_color
+    processed_mask[:, ::sample_size_pixels, :] = line_color
+    processed_mask[::sample_size_pixels, :, :] = line_color
     processed_spots = pd.DataFrame(
         kept_rows,
         columns=["slide_name", "selected", "x", "y", "pixel_x", "pixel_y"],

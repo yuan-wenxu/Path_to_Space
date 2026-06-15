@@ -6,6 +6,8 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 
+from common.smoothing import smooth_genes_kdtree
+
 
 class SlideDataset(Dataset):
     def __init__(self, features):
@@ -90,3 +92,23 @@ def predict_st(features_list, model_path: str, gene_file: str, device_name: str 
     df_pred = pd.DataFrame(pred_matrix, columns=genes, index=spot_names)
     coord_df = parse_spot_coordinates(spot_names)
     return coord_df.join(df_pred)
+
+
+def smooth_st_predictions(
+    st_predictions: pd.DataFrame,
+    gene_file: str,
+    radius: float = 2.0,
+    weights: str | float = "uniform",
+) -> pd.DataFrame:
+    genes = load_gene_names(gene_file)
+    missing_genes = sorted(set(genes) - set(st_predictions.columns))
+    if missing_genes:
+        raise ValueError(f"ST prediction is missing {len(missing_genes)} required genes. Example: {missing_genes[:5]}")
+
+    return smooth_genes_kdtree(
+        slide_df=st_predictions,
+        genes=genes,
+        radius=radius,
+        coord_cols=("x", "y"),
+        weights=weights,
+    )

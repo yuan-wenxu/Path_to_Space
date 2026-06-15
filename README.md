@@ -19,14 +19,15 @@ See [NOTICE](NOTICE) for attribution details.
 ## Included pipeline
 
 1. Read one H&E slide image.
-2. Sample spot centers on a regular `100` micron grid.
+2. Sample tiles from the top-left corner in a seamless, non-overlapping grid.
 3. Generate slide-level `metadata` and spot-level `x`, `y`, `pixel_x`, `pixel_y`.
 4. Crop a fixed `80` micron square at each sampled spot.
 5. Resize each crop to `tile_size x tile_size`.
 6. Save a combined preview image with `img_mask` and `processed_mask`.
 7. Normalize stain and extract CTransPath features.
 8. Run one trained ST prediction model to predict spatial transcriptomics.
-9. Optionally run one trained cell type model to predict `TILs`, `Stromal`, and `Epithelial`.
+9. Smooth the ST predictions with a KDTree neighborhood mean in grid coordinates.
+10. Optionally run one trained cell type model to predict `TILs`, `Stromal`, and `Epithelial`.
 
 ## Required input
 
@@ -37,11 +38,9 @@ The script automatically builds sampling metadata from that image:
 
 - `slide_name`: parsed automatically from the input image filename
 - `x`, `y`: grid indices
-- `pixel_x`, `pixel_y`: pixel-center positions on the image
+- `pixel_x`, `pixel_y`: pixel-center positions of each sampled tile on the image
 
-Neighboring spot centers are spaced by `100` microns by default, converted to pixels using:
-
-`spot_spacing_pixels = 100 / microns_per_pixel`
+Sampling starts at the top-left corner of the image and advances by one full sample width each time, so neighboring tiles have no gaps or overlap.
 
 Each sampled crop covers a fixed `80` microns, converted to pixels using:
 
@@ -90,6 +89,7 @@ python scripts/run_inference.py \
   --ctranspath-weights /path/to/ctranspath_feature_extractor.pth \
   --st-model /path/to/st_prediction_model.pth \
   --gene-file /path/to/st_gene_list.pkl \
+  --smooth-radius 2.0 \
   --output-dir /path/to/output
 ```
 
@@ -102,6 +102,7 @@ python scripts/run_inference.py \
   --ctranspath-weights /path/to/ctranspath_feature_extractor.pth \
   --st-model /path/to/st_prediction_model.pth \
   --gene-file /path/to/st_gene_list.pkl \
+  --smooth-radius 2.0 \
   --cell-model /path/to/cell_type_prediction_model.joblib \
   --cell-feature-list /path/to/cell_type_feature_list.txt \
   --output-dir /path/to/output
@@ -115,5 +116,7 @@ python scripts/run_inference.py \
 - `<slide_name>_mask.png`
 - `<slide_name>_st_predictions.pkl`
 - `<slide_name>_st_predictions.csv`
+- `<slide_name>_st_predictions_smoothed.pkl`
+- `<slide_name>_st_predictions_smoothed.csv`
 - optional `<slide_name>_cell_type_predictions.pkl`
 - optional `<slide_name>_cell_type_predictions.csv`
