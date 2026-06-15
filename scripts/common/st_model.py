@@ -46,8 +46,13 @@ def get_device(device_name: str | None = None) -> torch.device:
 
 
 def load_gene_names(gene_file: str) -> np.ndarray:
-    genes = pd.read_pickle(gene_file)
-    return genes["gene"].values
+    if gene_file.endswith(".pkl"):
+        genes = pd.read_pickle(gene_file)
+        return genes["gene"].values
+    if gene_file.endswith(".txt"):
+        with open(gene_file) as f:
+            return np.array([line.strip() for line in f if line.strip()])
+    raise ValueError(f"Unsupported gene file format: {gene_file}")
 
 
 def parse_spot_coordinates(names: Iterable[str]) -> pd.DataFrame:
