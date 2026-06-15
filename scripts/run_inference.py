@@ -23,17 +23,17 @@ def parse_args():
     parser.add_argument(
         "--ctranspath-weights",
         required=True,
-        help="Path to the CTransPath feature extractor weights, e.g. ctranspath_feature_extractor.pth",
+        help="Path to the CTransPath feature extractor weights, e.g. ctranspath.pth",
     )
     parser.add_argument(
-        "--st-model",
+        "--st-model-dir",
         required=True,
-        help="Path to the spatial transcriptomics prediction model, e.g. st_prediction_model.pth",
+        help="Path to the extracted spatial transcriptomics MLP ensemble directory, e.g. /path/to/mlp_ensemble (from mlp_ensemble.tar.gz)",
     )
     parser.add_argument(
         "--gene-file",
         required=True,
-        help="Path to the spatial transcriptomics gene list, e.g. st_gene_list.pkl",
+        help="Path to the spatial transcriptomics gene list, e.g. genes.txt or gene_file.pkl",
     )
     parser.add_argument("--output-dir", required=True, help="Directory where predictions will be saved")
     parser.add_argument("--batch-size", type=int, default=128, help="Feature extraction batch size")
@@ -43,12 +43,12 @@ def parse_args():
     parser.add_argument(
         "--cell-model",
         default=None,
-        help="Optional cell type prediction model path, e.g. cell_type_prediction_model.joblib",
+        help="Optional cell type prediction model path, e.g. cell_type_prediction/model_fold_0.joblib",
     )
     parser.add_argument(
         "--cell-feature-list",
         default=None,
-        help="Optional explicit cell type feature list path, e.g. cell_type_feature_list.txt",
+        help="Optional explicit cell type feature list path, e.g. cell_type_prediction/best_features_fold_0.txt",
     )
     return parser.parse_args()
 
@@ -80,7 +80,7 @@ def main():
 
     st_df = predict_st(
         features_list=features_list,
-        model_path=args.st_model,
+        model_dir=args.st_model_dir,
         gene_file=args.gene_file,
         device_name=args.device,
     )

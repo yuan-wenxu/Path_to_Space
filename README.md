@@ -57,14 +57,26 @@ This preview is saved as PNG with `dpi=300`.
 
 ## Required model files
 
-- `ctranspath_feature_extractor.pth`
-- `st_prediction_model.pth`
-- `st_gene_list.pkl`
+- `ctranspath.pth`
+- `mlp_ensemble.tar.gz` (extract it first, then pass the extracted `mlp_ensemble/` directory to `--st-model-dir`)
+- `genes.txt` or `gene_file.pkl`
 
 Optional cell type files:
 
-- `cell_type_prediction_model.joblib`
-- `cell_type_feature_list.txt`
+- `cell_type_prediction/model_fold_0.joblib`
+- `cell_type_prediction/best_features_fold_0.txt`
+
+Model sources used in this repo setup:
+
+- ST inference weights (`ctranspath.pth`, `mlp_ensemble.tar.gz`, `genes.txt`) are downloaded from Zenodo record `20174301`: https://zenodo.org/records/20174301
+- The cell type prediction files in this setup are documented as downloaded from Zenodo record `20171390`: https://zenodo.org/records/20171390
+
+Limitations of cell type prediction:
+
+- The cell type prediction in this repository is limited by model availability.
+- The original release does not provide a full set of cell type models for all datasets or scenarios; it only provides one model set associated with a single dataset.
+- As a result, the optional cell type prediction here should be treated as a dataset-specific reference output rather than a universally reliable cell type annotation model.
+- Predictions for `TILs`, `Stromal`, and `Epithelial` may not generalize well to slides from other datasets, cohorts, or experimental settings.
 
 Cell type prediction is skipped unless both files are provided explicitly:
 
@@ -86,9 +98,9 @@ Direct command:
 python scripts/run_inference.py \
   --slide-image /path/to/slide.tif \
   --microns-per-pixel 0.5 \
-  --ctranspath-weights /path/to/ctranspath_feature_extractor.pth \
-  --st-model /path/to/st_prediction_model.pth \
-  --gene-file /path/to/st_gene_list.pkl \
+  --ctranspath-weights /path/to/ctranspath.pth \
+  --st-model-dir /path/to/mlp_ensemble \
+  --gene-file /path/to/genes.txt \
   --smooth-radius 2.0 \
   --output-dir /path/to/output
 ```
@@ -99,12 +111,12 @@ Run with optional cell type prediction:
 python scripts/run_inference.py \
   --slide-image /path/to/slide.tif \
   --microns-per-pixel 0.5 \
-  --ctranspath-weights /path/to/ctranspath_feature_extractor.pth \
-  --st-model /path/to/st_prediction_model.pth \
-  --gene-file /path/to/st_gene_list.pkl \
+  --ctranspath-weights /path/to/ctranspath.pth \
+  --st-model-dir /path/to/mlp_ensemble \
+  --gene-file /path/to/genes.txt \
   --smooth-radius 2.0 \
-  --cell-model /path/to/cell_type_prediction_model.joblib \
-  --cell-feature-list /path/to/cell_type_feature_list.txt \
+  --cell-model /path/to/cell_type_prediction/model_fold_0.joblib \
+  --cell-feature-list /path/to/cell_type_prediction/best_features_fold_0.txt \
   --output-dir /path/to/output
 ```
 

@@ -1,23 +1,15 @@
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import Dataset
 
 from common.smoothing import smooth_genes_kdtree
 
-
-class SlideDataset(Dataset):
-    def __init__(self, features):
-        self.features = features
-
-    def __getitem__(self, index):
-        return torch.Tensor(self.features[index][1]).float().unsqueeze(0)
-
-    def __len__(self):
-        return len(self.features)
+N_IK_FOLDS = 22
+N_IL_FOLDS = 7
 
 
 class MLPRegression(nn.Module):
@@ -36,7 +28,7 @@ class MLPRegression(nn.Module):
     def forward(self, x):
         x = self.layer0(x)
         x = self.layer1(x)
-        return torch.mean(x, dim=0)
+        return x
 
 
 def get_device(device_name: str | None = None) -> torch.device:
@@ -74,25 +66,53 @@ def parse_spot_coordinates(names: Iterable[str]) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("spot_name")
 
 
-def predict_st(features_list, model_path: str, gene_file: str, device_name: str | None = None) -> pd.DataFrame:
+def _load_ensemble_models(
+    ensemble_dir: str,
+    n_genes: int,
+    device: torch.device,
+) -> dict[tuple[int, int], MLPRegression]:
+    ensemble_path = Path(ensemble_dir)
+    models: dict[tuple[int, int], MLPRegression] = {}
+    missing: list[Path] = []
+
+    for ik in range(N_IK_FOLDS):
+        for il in range(N_IL_FOLDS):
+            ckpt = ensemble_path / f"result_{ik}_{il}_0" / "model_trained.pth"
+            if not ckpt.exists():
+                missing.append(ckpt)
+                continue
+
+            model = MLPRegression(n_inputs=768, n_hiddens=768, n_outputs=n_genes)
+            state_dict = torch.load(ckpt, map_location=device)
+            model.load_state_dict(state_dict)
+            model.to(device)
+            model.eval()
+            models[(ik, il)] = model
+
+    if missing:
+        raise FileNotFoundError(
+            f"Missing {len(missing)} ensemble checkpoint(s). First missing file: {missing[0]}"
+        )
+
+    return models
+
+
+def predict_st(features_list, model_dir: str, gene_file: str, device_name: str | None = None) -> pd.DataFrame:
     device = get_device(device_name)
     genes = load_gene_names(gene_file)
-    dataset = SlideDataset(features_list)
-    model = MLPRegression(n_inputs=768, n_hiddens=768, n_outputs=len(genes))
-    state_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
+    feature_matrix = np.stack([feature for _name, feature in features_list]).astype(np.float32)
+    x = torch.as_tensor(feature_matrix, dtype=torch.float32, device=device)
+    models = _load_ensemble_models(model_dir, len(genes), device)
 
-    preds = []
+    preds_ik = np.zeros((N_IK_FOLDS, len(features_list), len(genes)), dtype=np.float32)
     with torch.no_grad():
-        for x in dataset:
-            y = model(x.float().to(device))
-            if y.dim() == 1:
-                y = y.unsqueeze(0)
-            preds.append(y.detach().cpu().numpy())
+        for ik in range(N_IK_FOLDS):
+            preds_il = np.zeros((N_IL_FOLDS, len(features_list), len(genes)), dtype=np.float32)
+            for il in range(N_IL_FOLDS):
+                preds_il[il] = models[(ik, il)](x).detach().cpu().numpy()
+            preds_ik[ik] = preds_il.mean(axis=0)
 
-    pred_matrix = np.concatenate(preds, axis=0)
+    pred_matrix = preds_ik.mean(axis=0)
     spot_names = [name for name, _feature in features_list]
     df_pred = pd.DataFrame(pred_matrix, columns=genes, index=spot_names)
     coord_df = parse_spot_coordinates(spot_names)
